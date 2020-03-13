@@ -1,6 +1,6 @@
 % require PsychToolbox setup
 % set current directory to the folder
-folder_path = 'C:\Users\shh078\Documents\NFB';
+folder_path = pwd;
 cd(folder_path)
 
 % addpath and tools
@@ -67,8 +67,11 @@ config.GCOH.alpha = 0.5;            % coefficient for determining target thresho
 
 
 %% set up parameters
-% user select movie 
-if config.USER_SELECT   % select movie file used for neurofeedback
+% define default movie files for the two NFB sessions
+if ~config.USER_SELECT && exist('media\Painting_Classical.mp4')
+    config.MOVIE_NAME{1} = [folder_path '\media\Painting_Classical.mp4'];
+    config.MOVIE_NAME{2} = [folder_path '\media\Painting_Classical.mp4'];
+else % user select movie file used for neurofeedback
     [movie_file,movie_path] = uigetfile('*.*','Select two movie files','MultiSelect','on');
     if length(movie_file) == 2
         config.MOVIE_NAME{1} = [movie_path movie_file{1}];
@@ -76,10 +79,6 @@ if config.USER_SELECT   % select movie file used for neurofeedback
     else
         error('Please select two movie files')
     end
-else
-    % define default movie files for the two NFB sessions
-    config.MOVIE_NAME{1} = 'C:\Users\shh078\Documents\NFB\media\Painting_Classical.mp4';
-    config.MOVIE_NAME{2} = 'C:\Users\shh078\Documents\NFB\media\Painting_Classical.mp4';
 end
 
 % load target thresholds from previous sessions
