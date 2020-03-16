@@ -247,6 +247,7 @@ for SESSION_ID = 1:2
                     idx_range = (config.GCOH.WINSIZE+1):(nfb_idx-1);
                     INI_GCOH = mean( gcoh_all(SESSION_ID,idx_range) );  % average GCOH in the initial phase
                     
+                    % logic flow for determining the target value
                     if isempty(config.target_gcoh) % initial session
                         assert(config.SESSION_ID == 1, 'NFB: missing target_gcoh from previous sessions')
                         TARGET_GCOH = 1.05*INI_GCOH;
