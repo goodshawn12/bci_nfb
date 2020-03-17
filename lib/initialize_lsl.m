@@ -14,17 +14,20 @@ lsl.streamName = lsl.streamName(~ismember(lsl.streamName,['-' ' ']));
 %--------------------------------------------------------------------------
 %              Create LSL outlet for gamma coherence
 %--------------------------------------------------------------------------
-fprintf('Creating LSL stream for gamma coherence.\n');
-info = lsl_streaminfo(lsl.lslObj, 'NFB_coherence', 'EEG', 1, config.GCOH.SRATE, 'cf_float32', 'NFB_coherence');
-lsl.outlet_gcoh = lsl_outlet(info);
+if lsl.OUTPUT_GCOH
+    fprintf('Creating LSL stream for gamma coherence.\n');
+    info = lsl_streaminfo(lsl.lslObj, 'NFB_coherence', 'EEG', 1, config.GCOH.SRATE, 'cf_float32', 'NFB_coherence');
+    lsl.outlet_gcoh = lsl_outlet(info);
+end
 
 %--------------------------------------------------------------------------
 %              Create LSL outlet for feedback signal
 %--------------------------------------------------------------------------
-fprintf('Creating LSL stream for feedback signal.\n');
-info = lsl_streaminfo(lsl.lslObj, 'NFB_control', 'EEG', 1, config.GCOH.SRATE, 'cf_float32', 'NFB_control');
-lsl.outlet_nfb = lsl_outlet(info);
-
+if lsl.OUTPUT_NFB
+    fprintf('Creating LSL stream for feedback signal.\n');
+    info = lsl_streaminfo(lsl.lslObj, 'NFB_control', 'EEG', 1, config.GCOH.SRATE, 'cf_float32', 'NFB_control');
+    lsl.outlet_nfb = lsl_outlet(info);
+end
 
 %--------------------------------------------------------------------------
 %              Create LSL eventmarker outlet

@@ -1,6 +1,6 @@
 % require PsychToolbox setup
 % set current directory to the folder
-folder_path = pwd;
+folder_path = 'C:\Users\fsingh\Documents\bci_nfb';
 cd(folder_path)
 
 % addpath and tools
@@ -17,12 +17,12 @@ sca
 
 
 %% input subject and session information
-config.SUBJECT_ID = 1;
-config.SESSION_ID = 1;
+config.SUBJECT_ID = 2;
+config.SESSION_ID = 2;
 
 % define mock session
 config.MOCK_SUBJECT_ID = 1;     % Subject ID from which the pre-recorded NFB data were drawn
-config.MOCK_SESSION_ID = 1;     % Session ID from which the pre-recorded NFB data were drawn
+config.MOCK_SESSION_ID = 2;     % Session ID from which the pre-recorded NFB data were drawn
 
 %% define configuration 
 % EXP / NFB parameters
@@ -65,11 +65,14 @@ config.GCOH.CHANNAME = {'F3','F4'}; % channel labels for gamma coherence
 config.GCOH.SRATE = 1;              % refresh rate for gamma coherence (in Hz) 
 config.GCOH.alpha = 0.5;            % coefficient for determining target threshold
 
-
+% LSL stream setting
+lsl.OUTPUT_GCOH = 1;        % create lsl stream for gamma coherence (to be tested)
+lsl.OUTPUT_NFB = 1;         % create lsl stream for neurofeedback signal (to be tested)
+    
 %% set up parameters
 % define default movie files for the two NFB sessions
-if ~config.USER_SELECT && exist('media\Painting_Classical.mp4')
-    config.MOVIE_NAME{1} = [folder_path '\media\Painting_Classical.mp4'];
+if ~config.USER_SELECT && exist('media\Painting_Classical.mp4') && exist('media\NFB_17_min.mp4')
+    config.MOVIE_NAME{1} = [folder_path '\media\NFB_17_min.mp4'];
     config.MOVIE_NAME{2} = [folder_path '\media\Painting_Classical.mp4'];
 else % user select movie file used for neurofeedback
     [movie_file,movie_path] = uigetfile('*.*','Select two movie files','MultiSelect','on');
@@ -82,10 +85,10 @@ else % user select movie file used for neurofeedback
 end
 
 % load target thresholds from previous sessions
-config.filepath_subj = sprintf('data\\Subj_%d',config.SUBJECT_ID);
-config.filepath_sess = sprintf('data\\Subj_%d\\Sess_%d',config.SUBJECT_ID,config.SESSION_ID);
-config.filename_prev = sprintf('data\\Subj_%d\\Sess_%d\\target_gcoh_subj%d_sess%d.mat', ...
-    config.SUBJECT_ID,config.SESSION_ID-1,config.SUBJECT_ID,config.SESSION_ID-1);
+config.filepath_subj = [folder_path sprintf('\\data\\Subj_%d',config.SUBJECT_ID)];
+config.filepath_sess = [folder_path sprintf('\\data\\Subj_%d\\Sess_%d',config.SUBJECT_ID,config.SESSION_ID)];
+config.filename_prev = [folder_path sprintf('\\data\\Subj_%d\\Sess_%d\\target_gcoh_subj%d_sess%d.mat', ...
+    config.SUBJECT_ID,config.SESSION_ID-1,config.SUBJECT_ID,config.SESSION_ID-1)];
 if ~exist(config.filepath_subj,'dir'), mkdir(config.filepath_subj); end
 if ~exist(config.filepath_sess,'dir'), mkdir(config.filepath_sess); end
 if exist(config.filename_prev,'file')
@@ -136,15 +139,15 @@ lsl.inlet = eval(lsl.streamName); % grab info from lsl streawm
 
 
 %% start resting session
-% disp('Press Any Key To Start the Experiment!')
-% KbStrokeWait;
+disp('Press Any Key To Start the Experiment!')
+KbStrokeWait;
 result = main_NFB(config,lsl); 
 
 %% terminate all LSL streams
 % terminate lsl streams
 delete(lsl.outlet_event); 
-delete(lsl.outlet_gcoh); 
-delete(lsl.outlet_nfb);
+if lsl.OUTPUT_GCOH, delete(lsl.outlet_gcoh); end
+if lsl.OUTPUT_NFB, delete(lsl.outlet_nfb); end
 
 % terminate simulated EEG stream
 if config.SIMULATION, stop(handles); end

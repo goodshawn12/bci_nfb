@@ -63,7 +63,7 @@ startMsg_exp0{4} = ' ';
 startMsg_exp0{5} = 'try to minimize eye blinks and just relax your eyes on the screen.';
 startMsg_exp0{6} = ' ';
 startMsg_exp0{7} = ' ';
-startMsg_exp0{8} = 'Are you ready? Press Any Key To Start.';
+startMsg_exp0{8} = 'Are you ready? Press ENTER To Start.';
 startExp0Screen = sys_prepInstructionScreen(window, startMsg_exp0, BG_COLOR, ...
     text.TEXT_COLOR, text.TEXT_FONT, text.FONT_SIZE, centX, centY);
 
@@ -81,14 +81,14 @@ startMsg_NFB{2} = ' ';
 startMsg_NFB{3} = 'For the next 15 minute, please sit still, without talking, moving, or fidgeting. ';
 startMsg_NFB{4} = ' ';
 startMsg_NFB{5} = ' ';
-startMsg_NFB{6} = 'Are you ready? Press any key to continue.';
+startMsg_NFB{6} = 'Are you ready? Press ENTER to continue.';
 startNFBScreen = sys_prepInstructionScreen(window, startMsg_NFB, BG_COLOR, ...
     text.TEXT_COLOR, text.TEXT_FONT, text.FONT_SIZE, centX, centY);
 
 breakMsg_NFB = cell(1,3);
 breakMsg_NFB{1} = 'Take a break!';
 breakMsg_NFB{2} = ' ';
-breakMsg_NFB{3} = 'When you are ready, press any key to continue.';
+breakMsg_NFB{3} = 'When you are ready, press ENTER to continue.';
 breakNFBScreen = sys_prepInstructionScreen(window, breakMsg_NFB, BG_COLOR, ...
     text.TEXT_COLOR, text.TEXT_FONT, text.FONT_SIZE, centX, centY);
 
@@ -234,7 +234,7 @@ for SESSION_ID = 1:2
         gcoh_all(SESSION_ID,nfb_idx) = gcoh;
         
         % output to LSL outlet for gamma coherence
-        lsl.outlet_gcoh.push_sample(gcoh);
+        if lsl.OUTPUT_GCOH, lsl.outlet_gcoh.push_sample(gcoh); end
         
         % compute NFB control signal
         if SESSION_ID == 1
@@ -275,6 +275,7 @@ for SESSION_ID = 1:2
                 % compute NFB_SIGNAL
                 NFB_SIGNAL = (gcoh>=TARGET_GCOH);
             else % MOCK session case
+                INI_GCOH = config.MOCK_TARGET_GCOH.ini;
                 TARGET_GCOH = config.MOCK_TARGET_GCOH.nfb;
                 NFB_SIGNAL = config.MOCK_NFB_ALL(SESSION_ID,nfb_idx);
             end
@@ -289,7 +290,7 @@ for SESSION_ID = 1:2
         nfb_all(SESSION_ID,nfb_idx) = NFB_SIGNAL; % save the NFB_SIGNAL
         
         % output to LSL outlet for NFB control signal
-        lsl.outlet_nfb.push_sample(double(NFB_SIGNAL));
+        if lsl.OUTPUT_NFB, lsl.outlet_nfb.push_sample(double(NFB_SIGNAL)); end
         
         % neurofeedback modes
         if config.NFB_MODE == 0 % mode 0: display gamma cohenerece (debug)
@@ -375,7 +376,7 @@ for SESSION_ID = 1:2
             
             % break the loop if press SPACE key; break the exp if press ESC key
             [~, ~, keyCode] = KbCheck;
-            if keyCode(escKey) || keyCode(spaceKey)
+            if keyCode(escKey)
                 sca
                 return
             end
