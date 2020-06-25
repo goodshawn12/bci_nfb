@@ -204,8 +204,10 @@ KbStrokeWait;
 
 % initiate variable
 TARGET_GCOH = [];
-gcoh_all = zeros(2,config.NFB_TIME*config.GCOH.SRATE);  % store gamma coherence during the experiment
-nfb_all = zeros(2,config.NFB_TIME*config.GCOH.SRATE);   % store nfb signal during the experiment
+gcoh_all = zeros(2,(config.NFB_TIME+config.NFB_INI)*config.GCOH.SRATE);  % store gamma coherence during the experiment
+nfb_all = zeros(2,(config.NFB_TIME+config.NFB_INI)*config.GCOH.SRATE);   % store nfb signal during the experiment
+target_gcoh_all = zeros(2,ceil(config.NFB_TIME/config.NFB_DYN_TIME));
+target_count = 0;
 failed_count = 0;  % decide if GCOH needs to be lowered
 
 for SESSION_ID = 1:2
@@ -226,7 +228,13 @@ for SESSION_ID = 1:2
         Screen('PlayMovie', NFB_movie, 1);
     end
     
-    while continue_NFB && (GetSecs-start_time)<config.NFB_TIME
+    if SESSION_ID == 1
+        SESSION_TIME = config.NFB_TIME + config.NFB_INI;
+    else
+        SESSION_TIME = config.NFB_TIME;
+    end
+    
+    while continue_NFB && (GetSecs-start_time)<SESSION_TIME
         % record inner loop time
         nfb_idx = floor((GetSecs-start_time)/config.GCOH.SRATE) + 1;
         
@@ -250,6 +258,8 @@ for SESSION_ID = 1:2
                     idx_range = (config.GCOH.WINSIZE+1):(nfb_idx-1);
                     INI_GCOH = prctile( gcoh_all(SESSION_ID,idx_range), 20 );  % 20 percentile of GCOH in the initial phase
                     TARGET_GCOH = INI_GCOH;
+                    target_count = target_count+1;
+                    target_gcoh_all(SESSION_ID,target_count) = TARGET_GCOH;
                     
                     % logic flow for determining the target value
 %                     if isempty(config.target_gcoh) % initial session
@@ -292,7 +302,8 @@ for SESSION_ID = 1:2
                     else % target GCOH does not change when failed the first time 
                         failed_count = 1;
                     end
-                   
+                    target_count = target_count+1;
+                    target_gcoh_all(SESSION_ID,target_count) = TARGET_GCOH;
                 end
                 % compute NFB_SIGNAL
                 NFB_SIGNAL = (gcoh>=TARGET_GCOH);
@@ -316,6 +327,8 @@ for SESSION_ID = 1:2
                     else % target GCOH does not change when failed first time 
                         failed_count = 1;
                     end
+                    target_count = 1;
+                    target_gcoh_all(SESSION_ID,target_count) = TARGET_GCOH;
                 elseif nfb_idx == config.NFB_DYN_TIME +1 || nfb_idx == 2*config.NFB_DYN_TIME +1 ||...
                        nfb_idx == 3*config.NFB_DYN_TIME +1 || nfb_idx == 4*config.NFB_DYN_TIME +1
                     % dynamic neurofeedback
@@ -330,6 +343,8 @@ for SESSION_ID = 1:2
                     else % target GCOH does not change when failed first time 
                         failed_count = 1;
                     end
+                    target_count = target_count + 1;
+                    target_gcoh_all(SESSION_ID,target_count) = TARGET_GCOH;
                 end
                 NFB_SIGNAL = (gcoh>=TARGET_GCOH);
             else
@@ -455,25 +470,35 @@ end
 
 
 %% save gamma coherence values and NFB control signals
-cat_gcoh = [gcoh_all(1,:), gcoh_all(2,:)];
+cat_gcoh = [gcoh_all(1,:), gcoh_all(2,1:config.NFB_TIME*config.GCOH.SRATE)];
+cat_Tgcoh = [target_gcoh_all(1,:), target_gcoh_all(2,:)];
 if config.SAVE_ALL
     cat_nfb = [nfb_all(1,:), nfb_all(2,:)];
     figure, plot((1:length(cat_gcoh))/config.GCOH.SRATE/60, cat_gcoh,'linewidth',2); xlabel('Time (min)'); ylabel('Gamma Coherence'); set(gca,'fontsize',12);
-    if ~isempty(TARGET_GCOH), hold on, yline(TARGET_GCOH,'--k'); end
+    if ~isempty(TARGET_GCOH)
+        hold on
+        for N_target = 1:size(cat_Tgcoh,2)
+            time_idx = ([N_target-1 N_target]*config.NFB_DYN_TIME+config.NFB_INI)/60;
+            line(time_idx,[cat_Tgcoh(N_target) cat_Tgcoh(N_target)],'Color','r','LineStyle','--'); 
+        end
+    end
     saveas(gcf, [config.filepath_sess '\\gcoh_all.png']);
     figure, stem((1:length(cat_nfb))/config.GCOH.SRATE/60, cat_nfb); xlabel('Time (min)'); ylabel('Neurofeedback'); set(gca,'fontsize',12);
-    saveas(gcf,[config.filepath_sess '\\nfb_all.png']);
+    saveas(gcf, [config.filepath_sess '\\nfb_all.png']);
+    figure, plot(((0:length(cat_Tgcoh)-1)*config.NFB_DYN_TIME+config.NFB_INI)/60, cat_Tgcoh,'--o','linewidth',2); 
+    xlim([0 (config.NFB_INI+2*config.NFB_TIME)/60]); xlabel('Time (min)'); ylabel('Target Gamma Coherence'); set(gca,'fontsize',12);
+    saveas(gcf, [config.filepath_sess '\\target_gcoh_all.png']);
 end
 
 % modify target gamma coherence if the performance is low
-if config.SESSION_ID > 1
-    if mean(cat_gcoh > config.target_gcoh(config.SESSION_ID-1).nfb) <= 0.5
-        TARGET_GCOH = 0.95 * TARGET_GCOH;
-    end
-end
+% if config.SESSION_ID > 1
+%     if mean(cat_gcoh > config.target_gcoh(config.SESSION_ID-1).nfb) <= 0.5
+%         TARGET_GCOH = 0.95 * TARGET_GCOH;
+%     end
+% end
 config.target_gcoh(config.SESSION_ID).rest = REST_GCOH;
 config.target_gcoh(config.SESSION_ID).ini = INI_GCOH;
-config.target_gcoh(config.SESSION_ID).nfb = TARGET_GCOH;
+config.target_gcoh(config.SESSION_ID).nfb = target_gcoh_all;
 
 % save final results
 target_gcoh = config.target_gcoh;
@@ -484,7 +509,7 @@ else
     mock_nfb_all = config.MOCK_NFB_ALL;
     mock_filename = config.MOCK_filename;
     save([config.filepath_sess, sprintf('\\target_gcoh_subj%d_sess%d.mat',config.SUBJECT_ID,config.SESSION_ID)], ...
-        'target_gcoh','gcoh_all','nfb_all','mock_nfb_all','mock_filename');
+        'target_gcoh','gcoh_all','nfb_all','target_gcoh_all','mock_nfb_all','mock_filename');
 end
 
 %% closing
