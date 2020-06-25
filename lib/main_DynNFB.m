@@ -261,31 +261,7 @@ for SESSION_ID = 1:2
                     target_count = target_count+1;
                     target_gcoh_all(SESSION_ID,target_count) = TARGET_GCOH;
                     
-                    % logic flow for determining the target value
-%                     if isempty(config.target_gcoh) % initial session
-%                         assert(config.SESSION_ID == 1, 'NFB: missing target_gcoh from previous sessions')
-%                         TARGET_GCOH = INI_GCOH;
-%                     else
-%                         assert(config.SESSION_ID == (length(config.target_gcoh)+1), 'NFB.m: recorded target_gcoh mistached with session ID');
-%                         config.target_gcoh(config.SESSION_ID).rest = INI_GCOH;
-%                         
-%                         if INI_GCOH >= config.target_gcoh(config.SESSION_ID-1).nfb % current coherence is larger than previous target threshold
-%                             TARGET_GCOH = INI_GCOH;
-%                         else
-%                             if config.SESSION_ID > 4 % current coherence is smaller than previous 4 consecutive sessions
-%                                 if INI_GCOH < config.target_gcoh(config.SESSION_ID-1).nfb && ...
-%                                         config.target_gcoh(config.SESSION_ID-1).rest < config.target_gcoh(config.SESSION_ID-2).nfb && ...
-%                                         config.target_gcoh(config.SESSION_ID-2).rest < config.target_gcoh(config.SESSION_ID-3).nfb && ...
-%                                         config.target_gcoh(config.SESSION_ID-3).rest < config.target_gcoh(config.SESSION_ID-4).nfb
-%                                     TARGET_GCOH = 1.05 * config.target_gcoh(config.SESSION_ID-1).nfb;
-%                                 end
-%                             end
-%                             if isempty(TARGET_GCOH)
-%                                 TARGET_GCOH = config.GCOH.alpha * INI_GCOH + (1-config.GCOH.alpha) * config.target_gcoh(config.SESSION_ID-1).nfb;
-%                             end
-%                         end
-%                     end
-
+                % logic flow for determining the target value
                 % decision point at the onset of 4, 7, 10, 13 min
                 % (store the time in config?)
                 elseif nfb_idx == config.NFB_INI+config.NFB_DYN_TIME+1 || nfb_idx == config.NFB_INI+2*config.NFB_DYN_TIME+1 ||...
@@ -490,12 +466,7 @@ if config.SAVE_ALL
     saveas(gcf, [config.filepath_sess '\\target_gcoh_all.png']);
 end
 
-% modify target gamma coherence if the performance is low
-% if config.SESSION_ID > 1
-%     if mean(cat_gcoh > config.target_gcoh(config.SESSION_ID-1).nfb) <= 0.5
-%         TARGET_GCOH = 0.95 * TARGET_GCOH;
-%     end
-% end
+
 config.target_gcoh(config.SESSION_ID).rest = REST_GCOH;
 config.target_gcoh(config.SESSION_ID).ini = INI_GCOH;
 config.target_gcoh(config.SESSION_ID).nfb = target_gcoh_all;
