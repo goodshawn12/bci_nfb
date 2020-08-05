@@ -188,6 +188,11 @@ if ~config.IS_REAL_SESS
         else
             error('NFB: no target coherence available for MOCK NFB session');
         end
+        if isfield(temp,'gcoh_all')
+            config.MOCK_GCOH_ALL = temp.gcoh_all;
+        else
+            error('NFB: no target coherence available for MOCK NFB session');
+        end
     else
         error('NFB: no pre-recorded NFB data available for MOCK NFB session');
     end
@@ -261,7 +266,31 @@ for SESSION_ID = 1:2
                     target_count = target_count+1;
                     target_gcoh_all(SESSION_ID,target_count) = TARGET_GCOH;
                     
-                % logic flow for determining the target value
+                    % logic flow for determining the target value
+%                     if isempty(config.target_gcoh) % initial session
+%                         assert(config.SESSION_ID == 1, 'NFB: missing target_gcoh from previous sessions')
+%                         TARGET_GCOH = INI_GCOH;
+%                     else
+%                         assert(config.SESSION_ID == (length(config.target_gcoh)+1), 'NFB.m: recorded target_gcoh mistached with session ID');
+%                         config.target_gcoh(config.SESSION_ID).rest = INI_GCOH;
+%                         
+%                         if INI_GCOH >= config.target_gcoh(config.SESSION_ID-1).nfb % current coherence is larger than previous target threshold
+%                             TARGET_GCOH = INI_GCOH;
+%                         else
+%                             if config.SESSION_ID > 4 % current coherence is smaller than previous 4 consecutive sessions
+%                                 if INI_GCOH < config.target_gcoh(config.SESSION_ID-1).nfb && ...
+%                                         config.target_gcoh(config.SESSION_ID-1).rest < config.target_gcoh(config.SESSION_ID-2).nfb && ...
+%                                         config.target_gcoh(config.SESSION_ID-2).rest < config.target_gcoh(config.SESSION_ID-3).nfb && ...
+%                                         config.target_gcoh(config.SESSION_ID-3).rest < config.target_gcoh(config.SESSION_ID-4).nfb
+%                                     TARGET_GCOH = 1.05 * config.target_gcoh(config.SESSION_ID-1).nfb;
+%                                 end
+%                             end
+%                             if isempty(TARGET_GCOH)
+%                                 TARGET_GCOH = config.GCOH.alpha * INI_GCOH + (1-config.GCOH.alpha) * config.target_gcoh(config.SESSION_ID-1).nfb;
+%                             end
+%                         end
+%                     end
+
                 % decision point at the onset of 4, 7, 10, 13 min
                 % (store the time in config?)
                 elseif nfb_idx == config.NFB_INI+config.NFB_DYN_TIME+1 || nfb_idx == config.NFB_INI+2*config.NFB_DYN_TIME+1 ||...
@@ -285,7 +314,7 @@ for SESSION_ID = 1:2
                 NFB_SIGNAL = (gcoh>=TARGET_GCOH);
             else % MOCK session case
                 INI_GCOH = config.MOCK_TARGET_GCOH.ini;
-                TARGET_GCOH = config.MOCK_TARGET_GCOH.nfb;
+                TARGET_GCOH = config.MOCK_TARGET_GCOH.nfb(1);
                 NFB_SIGNAL = config.MOCK_NFB_ALL(SESSION_ID,nfb_idx);
             end
             
@@ -448,28 +477,41 @@ end
 %% save gamma coherence values and NFB control signals
 cat_gcoh = [gcoh_all(1,:), gcoh_all(2,1:config.NFB_TIME*config.GCOH.SRATE)];
 cat_Tgcoh = [target_gcoh_all(1,:), target_gcoh_all(2,:)];
+if config.IS_REAL_SESS==0   % mock session
+    cat_gcoh_plot = [config.MOCK_GCOH_ALL(1,:), config.MOCK_GCOH_ALL(2,1:config.NFB_TIME*config.GCOH.SRATE)];
+    cat_Tgcoh_plot = reshape(config.MOCK_TARGET_GCOH.nfb,1,[]);
+else
+    cat_gcoh_plot = cat_gcoh;
+    cat_Tgcoh_plot = cat_Tgcoh;
+end
+
 if config.SAVE_ALL
     cat_nfb = [nfb_all(1,:), nfb_all(2,:)];
-    figure, plot((1:length(cat_gcoh))/config.GCOH.SRATE/60, cat_gcoh,'linewidth',2); xlabel('Time (min)'); ylabel('Gamma Coherence'); set(gca,'fontsize',12);
+    figure, plot((1:length(cat_gcoh_plot))/config.GCOH.SRATE/60, cat_gcoh_plot,'linewidth',2); xlabel('Time (min)'); ylabel('Gamma Coherence'); set(gca,'fontsize',12);
     if ~isempty(TARGET_GCOH)
         hold on
-        for N_target = 1:size(cat_Tgcoh,2)
+        for N_target = 1:size(cat_Tgcoh_plot,2)
             time_idx = ([N_target-1 N_target]*config.NFB_DYN_TIME+config.NFB_INI)/60;
-            line(time_idx,[cat_Tgcoh(N_target) cat_Tgcoh(N_target)],'Color','r','LineStyle','--'); 
+            line(time_idx,[cat_Tgcoh_plot(N_target) cat_Tgcoh_plot(N_target)],'Color','r','LineStyle','--'); 
         end
     end
     saveas(gcf, [config.filepath_sess '\\gcoh_all.png']);
     figure, stem((1:length(cat_nfb))/config.GCOH.SRATE/60, cat_nfb); xlabel('Time (min)'); ylabel('Neurofeedback'); set(gca,'fontsize',12);
     saveas(gcf, [config.filepath_sess '\\nfb_all.png']);
-    figure, plot(((0:length(cat_Tgcoh)-1)*config.NFB_DYN_TIME+config.NFB_INI)/60, cat_Tgcoh,'--o','linewidth',2); 
+    figure, plot(((0:length(cat_Tgcoh_plot)-1)*config.NFB_DYN_TIME+config.NFB_INI)/60, cat_Tgcoh_plot,'--o','linewidth',2); 
     xlim([0 (config.NFB_INI+2*config.NFB_TIME)/60]); xlabel('Time (min)'); ylabel('Target Gamma Coherence'); set(gca,'fontsize',12);
     saveas(gcf, [config.filepath_sess '\\target_gcoh_all.png']);
 end
 
-
-config.target_gcoh(config.SESSION_ID).rest = REST_GCOH;
-config.target_gcoh(config.SESSION_ID).ini = INI_GCOH;
-config.target_gcoh(config.SESSION_ID).nfb = target_gcoh_all;
+% modify target gamma coherence if the performance is low
+% if config.SESSION_ID > 1
+%     if mean(cat_gcoh > config.target_gcoh(config.SESSION_ID-1).nfb) <= 0.5
+%         TARGET_GCOH = 0.95 * TARGET_GCOH;
+%     end
+% end
+config.target_gcoh.rest = REST_GCOH;
+config.target_gcoh.ini = INI_GCOH;
+config.target_gcoh.nfb = target_gcoh_all;
 
 % save final results
 target_gcoh = config.target_gcoh;
