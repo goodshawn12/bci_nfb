@@ -1,6 +1,6 @@
 % require PsychToolbox setup
 % set current directory to the folder
-folder_path = 'C:\Users\fsingh\Documents\bci_nfb';
+folder_path = 'C:\Users\fnlab\Documents\bci_nfb';
 cd(folder_path)
 
 % addpath and tools
@@ -9,44 +9,88 @@ if ~exist('IS_SET_PATH')
     eeglab; close
     bcilab; close
     cd(folder_path)
-    addpath('media'); addpath(genpath('data')); addpath(genpath('lib'))
+    addpath('media'); addpath(genpath('lib'))
     IS_SET_PATH = 1;
 end
 delete(timerfindall)
 sca
 
 
-%% input subject and session information
-config.SUBJECT_ID = 2;
-config.SESSION_ID = 2;
+%% input study#, subject and session information
+% dialog box for user input
+prompt = {'Subject ID:','Session ID:'};
+dlgtitle = 'Input';
+dims = [1 70];
+opts.Resize = 'on';
 
-% define mock session
-config.MOCK_SUBJECT_ID = 1;     % Subject ID from which the pre-recorded NFB data were drawn
-config.MOCK_SESSION_ID = 2;     % Session ID from which the pre-recorded NFB data were drawn
+% choose study number
+study_list = {'R33', 'R01'};
+[STUDY_ID,tf] = listdlg('ListString',study_list,'ListSize',[150,150],...
+    'SelectionMode', 'Single', 'PromptString', 'Select the study name.');
+config.STUDY_ID = study_list{STUDY_ID};
+addpath(genpath(sprintf('%s_data', config.STUDY_ID)));
+
+ID_input = inputdlg(prompt,dlgtitle,dims,{'',''},opts);
+
+SUBJECT_ID = str2double(ID_input{1});
+SESSION_ID = str2double(ID_input{2});
+
+% check if entered values are valid
+while (isnan(SUBJECT_ID) || isnan(SESSION_ID) || (SUBJECT_ID < 1) || (SUBJECT_ID > 90) || ... 
+        ((mod(SUBJECT_ID,1) + mod(SESSION_ID,1)) ~= 0 )  || (SESSION_ID < 1)) % subj ID range 1~90
+    dlgtitle = 'Invalid Value. Please enter again.';
+    prompt = {'Enter subject ID (1 to 90):','Enter session ID:'};
+    ID_input = inputdlg(prompt,dlgtitle,dims,{'',''},opts);
+    SUBJECT_ID = str2double(ID_input{1});
+    SESSION_ID = str2double(ID_input{2});
+end
+
+config.SUBJECT_ID = SUBJECT_ID;
+config.SESSION_ID = SESSION_ID;
+
+% load randomization information
+if exist(sprintf('%s_subject_randomization.mat', config.STUDY_ID))
+    load(sprintf('%s_subject_randomization.mat', config.STUDY_ID));  % randomization
+    idx_subjID = find(randomization.SUBJECT_ID == SUBJECT_ID);
+    config.IS_REAL_SESS = randomization.IS_REAL_SESS(idx_subjID);            % 1: real session, 0: mock session (use NFB from previous session)
+    % define mock session
+    if ~config.IS_REAL_SESS
+        config.MOCK_SUBJECT_ID = randomization.MOCK_SUBJECT_ID(idx_subjID);  % Subject ID from which the pre-recorded NFB data were drawn
+        
+        % (TODO) check if real session data exist
+        config.MOCK_SESSION_ID = config.SESSION_ID;     % Session ID from which the pre-recorded NFB data were drawn
+    end
+else
+    error('Randomization error');
+end
 
 %% define configuration 
 % EXP / NFB parameters
-config.SIMULATION = 1;      % 1: use play-back EEG stream, 0: use online stream
-config.DEMO = 1;            % 1: for testing (debug), 0: for actual experiment
-config.IS_REAL_SESS = 1;    % 1: real session, 0: mock session (use NFB from previous session)
+config.SIMULATION = 0;      % 1: use play-back EEG stream, 0: use online stream
+config.DEMO = 0;            % 1: for testing (debug), 0: for actual experiment
 config.RUN_CALIB = 1;       % run eye-open resting session
 config.NFB_MODE = 2;        % 0: display gamma cohenerece (debug)
                             % 1: play movie - modulate movie frame size and sound volume
                             % 2: play movie - stop or play movie                                    
 config.SAVE_ALL = 1;        % save NFB signals and gamma coherences
+config.SKIP_TEST = 1;        % 1: skip PTB time sync tests
 
 % define DEMO and ACTUAL experiment settings
 if config.DEMO
     config.VERBOSE = 1;         % display information on screen (gamma coherence values) 
     config.REST_DURATION = 5;   % duration of resting session (in sec)
     config.NFB_INI = 30;        % duration of NFB session for determining threshold (in sec)
-    config.NFB_TIME = 60;     % duration of NFB session (in sec)
+    config.NFB_TIME = 60;       % duration of NFB session (in sec)
+    config.NFB_DYN_TIME = 15;   % duration of NFB session for determining dynamic threshold (in sec)
     config.USER_SELECT = 0;     % 1: user select movie, 0: default movie (best with size 1920 x 1080)
 else
+    
+    
     config.VERBOSE = 0;         % display information on screen (gamma coherence values) 
     config.REST_DURATION = 60;  % duration of resting session (in sec)
     config.NFB_INI = 60;        % duration of NFB session for determining threshold (in sec)
     config.NFB_TIME = 60*15;    % duration of NFB session (in sec)
+    config.NFB_DYN_TIME = 60*3; % duration of NFB session for determining dynamic threshold (in sec)
     config.USER_SELECT = 1;     % 1: user select movie, 0: default movie (best with size 1920 x 1080)
 end
 
@@ -71,11 +115,11 @@ lsl.OUTPUT_NFB = 1;         % create lsl stream for neurofeedback signal (to be 
     
 %% set up parameters
 % define default movie files for the two NFB sessions
-if ~config.USER_SELECT && exist('media\Painting_Classical.mp4') && exist('media\NFB_17_min.mp4')
-    config.MOVIE_NAME{1} = [folder_path '\media\NFB_17_min.mp4'];
-    config.MOVIE_NAME{2} = [folder_path '\media\Painting_Classical.mp4'];
+if ~config.USER_SELECT && exist('media\NFB_1_Nature_Classical.mp4') && exist('media\Feeling_Happy_Fish.mp4')
+    config.MOVIE_NAME{1} = [folder_path '\media\NFB_1_Nature_Classical.mp4'];
+    config.MOVIE_NAME{2} = [folder_path '\media\Feeling_Happy_Fish.mp4'];
 else % user select movie file used for neurofeedback
-    [movie_file,movie_path] = uigetfile('*.*','Select two movie files','MultiSelect','on');
+    [movie_file,movie_path] = uigetfile([folder_path '\media\*.*'],'Select two movie files','MultiSelect','on');
     if length(movie_file) == 2
         config.MOVIE_NAME{1} = [movie_path movie_file{1}];
         config.MOVIE_NAME{2} = [movie_path movie_file{2}];
@@ -85,10 +129,10 @@ else % user select movie file used for neurofeedback
 end
 
 % load target thresholds from previous sessions
-config.filepath_subj = [folder_path sprintf('\\data\\Subj_%d',config.SUBJECT_ID)];
-config.filepath_sess = [folder_path sprintf('\\data\\Subj_%d\\Sess_%d',config.SUBJECT_ID,config.SESSION_ID)];
-config.filename_prev = [folder_path sprintf('\\data\\Subj_%d\\Sess_%d\\target_gcoh_subj%d_sess%d.mat', ...
-    config.SUBJECT_ID,config.SESSION_ID-1,config.SUBJECT_ID,config.SESSION_ID-1)];
+config.filepath_subj = [folder_path sprintf('\\%s_data\\Subj_%d',config.STUDY_ID, config.SUBJECT_ID)];
+config.filepath_sess = [folder_path sprintf('\\%s_data\\Subj_%d\\Sess_%d',config.STUDY_ID, config.SUBJECT_ID,config.SESSION_ID)];
+config.filename_prev = [folder_path sprintf('\\%s_data\\Subj_%d\\Sess_%d\\target_gcoh_subj%d_sess%d.mat', ...
+    config.STUDY_ID,config.SUBJECT_ID,config.SESSION_ID-1,config.SUBJECT_ID,config.SESSION_ID-1)];
 if ~exist(config.filepath_subj,'dir'), mkdir(config.filepath_subj); end
 if ~exist(config.filepath_sess,'dir'), mkdir(config.filepath_sess); end
 if exist(config.filename_prev,'file')
@@ -101,18 +145,18 @@ end
 
 % load NFB data from recorded session for MOCK NFB session
 if ~config.IS_REAL_SESS
-    fprintf('Mock Session: importing data from Subject %d, Session %d\n',config.MOCK_SUBJECT_ID,config.MOCK_SESSION_ID);
-    config.MOCK_filename = sprintf('data\\Subj_%d\\Sess_%d\\target_gcoh_subj%d_sess%d.mat', ...
-        config.MOCK_SUBJECT_ID,config.MOCK_SESSION_ID,config.MOCK_SUBJECT_ID,config.MOCK_SESSION_ID);
+%     fprintf('Mock Session: importing data from Subject %d, Session %d\n',config.MOCK_SUBJECT_ID,config.MOCK_SESSION_ID);
+    config.MOCK_filename = sprintf('%s_data\\Subj_%d\\Sess_%d\\target_gcoh_subj%d_sess%d.mat', ...
+        config.STUDY_ID, config.MOCK_SUBJECT_ID,config.MOCK_SESSION_ID,config.MOCK_SUBJECT_ID,config.MOCK_SESSION_ID);
     if ~exist(config.MOCK_filename,'file')
-        error('Missing file: %s ',config.MOCK_filename);
+        error('Missing file');
     end
 end
 
 %% playback LSL stream or resolve online stream
 lsl.lslObj = lsl_loadlib();
 if config.SIMULATION    % play back data stream from pre-recorded data
-    playback_data = pop_loadset('data\demo_data.set');
+    playback_data = pop_loadset('R33_data\demo_data.set');
     handles = play_eegset_lsl('Dataset', playback_data, ...
         'DataStreamName', 'EEG2LSL', ...
         'EventStreamName', 'EEG2LSL-marker', ...
@@ -141,7 +185,7 @@ lsl.inlet = eval(lsl.streamName); % grab info from lsl streawm
 %% start resting session
 disp('Press Any Key To Start the Experiment!')
 KbStrokeWait;
-result = main_NFB(config,lsl); 
+result = main_DynNFB(config,lsl); 
 
 %% terminate all LSL streams
 % terminate lsl streams
