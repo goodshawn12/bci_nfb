@@ -27,6 +27,13 @@ PsychDefaultSetup(2);
 
 % For demo purpose - tolerate inaccurate timing (change to 0 for exp)
 Screen('Preference', 'SkipSyncTests', config.DEMO);
+
+% For laptops that can never pass PTB sync tests
+if  config.SKIP_TEST == 1
+    Screen('Preference', 'SkipSyncTests', config.SKIP_TEST);
+    Screen('Preference','VisualDebugLevel', 0);
+end
+
 if ~config.DEMO, HideCursor; end
 
 % prepare keyboard information
@@ -88,7 +95,7 @@ startNFBScreen = sys_prepInstructionScreen(window, startMsg_NFB, BG_COLOR, ...
 breakMsg_NFB = cell(1,3);
 breakMsg_NFB{1} = 'Take a break!';
 breakMsg_NFB{2} = ' ';
-breakMsg_NFB{3} = 'When you are ready, press ENTER to continue.';
+breakMsg_NFB{3} = 'When you are ready, ring the bell and we will be with you shortly.';
 breakNFBScreen = sys_prepInstructionScreen(window, breakMsg_NFB, BG_COLOR, ...
     text.TEXT_COLOR, text.TEXT_FONT, text.FONT_SIZE, centX, centY);
 
@@ -221,6 +228,7 @@ for SESSION_ID = 1:2
     
     % Open movie file
     if config.NFB_MODE
+        
         [NFB_movie, MOVIE_DURATION, MOVIE_FPS, MOVIE_W, MOVIE_H]= Screen('OpenMovie', window, config.MOVIE_NAME{SESSION_ID});
     end
     
@@ -479,7 +487,7 @@ cat_gcoh = [gcoh_all(1,:), gcoh_all(2,1:config.NFB_TIME*config.GCOH.SRATE)];
 cat_Tgcoh = [target_gcoh_all(1,:), target_gcoh_all(2,:)];
 if config.IS_REAL_SESS==0   % mock session
     cat_gcoh_plot = [config.MOCK_GCOH_ALL(1,:), config.MOCK_GCOH_ALL(2,1:config.NFB_TIME*config.GCOH.SRATE)];
-    cat_Tgcoh_plot = reshape(config.MOCK_TARGET_GCOH.nfb,1,[]);
+    cat_Tgcoh_plot = reshape(config.MOCK_TARGET_GCOH.nfb',1,[]);
 else
     cat_gcoh_plot = cat_gcoh;
     cat_Tgcoh_plot = cat_Tgcoh;
@@ -487,7 +495,8 @@ end
 
 if config.SAVE_ALL
     cat_nfb = [nfb_all(1,:), nfb_all(2,:)];
-    figure, plot((1:length(cat_gcoh_plot))/config.GCOH.SRATE/60, cat_gcoh_plot,'linewidth',2); xlabel('Time (min)'); ylabel('Gamma Coherence'); set(gca,'fontsize',12);
+    figure, plot((1:length(cat_gcoh_plot))/config.GCOH.SRATE/60, cat_gcoh_plot,'linewidth',2);...
+        xlabel('Time (min)'); ylabel('Gamma Coherence'); set(gca,'fontsize',12);
     if ~isempty(TARGET_GCOH)
         hold on
         for N_target = 1:size(cat_Tgcoh_plot,2)
